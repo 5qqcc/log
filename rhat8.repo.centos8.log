@@ -1,0 +1,103 @@
+cat > /etc/yum.repos.d/redhat.repo <<EOF
+[rhel-8-baseos-beta-source-rpms]
+name = Red Hat Enterprise Linux 8 - BaseOS Beta (Source RPMs)
+baseurl = https://downloads.redhat.com/redhat/rhel/rhel-8-beta/baseos/source/
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta,file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+[rhel-8-for-x86_64-baseos-beta-rpms]
+name = Red Hat Enterprise Linux 8 for x86_64 - BaseOS Beta (RPMs)
+baseurl = https://downloads.redhat.com/redhat/rhel/rhel-8-beta/baseos/x86_64/
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta,file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+[rhel-8-appstream-beta-source-rpms]
+name = Red Hat Enterprise Linux 8 - AppStream Beta (Source RPMs)
+baseurl = https://downloads.redhat.com/redhat/rhel/rhel-8-beta/appstream/source/
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta,file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+[rhel-8-for-x86_64-appstream-beta-rpms]
+name = Red Hat Enterprise Linux 8 for x86_64 - AppStream Beta (RPMs)
+baseurl = https://downloads.redhat.com/redhat/rhel/rhel-8-beta/appstream/x86_64/
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta,file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+EOF
+
+dnf clean all
+dnf makecache
+dnf install wget -y
+useradd -s /sbin/nologin mockbuild
+
+cat > /etc/yum.repos.d/redhat.repo <<EOF
+[BaseOS]
+name=CentOS-$releasever - Base
+mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=BaseOS&infra=$infra
+#baseurl=http://mirror.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/
+gpgcheck=1
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+EOF
+
+
+rpm -qa | grep yum | xargs rpm -e --nodeps
+rpm -qa | grep dnf | xargs rpm -e --nodeps
+
+wget http://mirrors.163.com/centos/8.0.1905/BaseOS/x86_64/os/Packages/dnf-data-4.0.9.2-5.el8.noarch.rpm
+wget http://mirrors.163.com/centos/8.0.1905/BaseOS/x86_64/os/Packages/python3-libdnf-0.22.5-5.el8_0.x86_64.rpm
+wget http://mirrors.163.com/centos/8.0.1905/BaseOS/x86_64/os/Packages/libdnf-0.22.5-5.el8_0.x86_64.rpm
+wget http://mirrors.163.com/centos/8.0.1905/BaseOS/x86_64/os/Packages/dnf-4.0.9.2-5.el8.noarch.rpm
+wget http://mirrors.163.com/centos/8.0.1905/BaseOS/x86_64/os/Packages/dnf-plugins-core-4.0.2.2-3.el8.noarch.rpm
+wget http://mirrors.163.com/centos/8.0.1905/BaseOS/x86_64/os/Packages/python3-dnf-4.0.9.2-5.el8.noarch.rpm
+wget http://mirrors.163.com/centos/8.0.1905/BaseOS/x86_64/os/Packages/python3-dnf-plugins-core-4.0.2.2-3.el8.noarch.rpm
+rpm -ivh * --force --nodeps
+
+
+
+#使用的是清华大学开源镜像站，文件地址：
+#https://github.com/hackyoMa/docker-centos/blob/8/CentOS-Base.repo
+#使用方法：
+cd /etc/yum.repos.d/
+rm -f CentOS-Base.repo CentOS-AppStream.repo CentOS-PowerTools.repo CentOS-centosplus.repo CentOS-Extras.repo
+curl -o CentOS-Base.repo https://raw.githubusercontent.com/hackyoMa/docker-centos/8/CentOS-Base.repo
+yum makecache
+
+
+cd /etc/pki/rpm-gpg
+wget https://mirrors.ustc.edu.cn/epel/RPM-GPG-KEY-EPEL-8
+cd
+wget https://mirrors.ustc.edu.cn/epel/8/Everything/x86_64/Packages/e/epel-release-8-7.el8.noarch.rpm
+
+cat > /etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial <<EOF
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v2.0.22 (GNU/Linux)
+
+mQINBFzMWxkBEADHrskpBgN9OphmhRkc7P/YrsAGSvvl7kfu+e9KAaU6f5MeAVyn
+rIoM43syyGkgFyWgjZM8/rur7EMPY2yt+2q/1ZfLVCRn9856JqTIq0XRpDUe4nKQ
+8BlA7wDVZoSDxUZkSuTIyExbDf0cpw89Tcf62Mxmi8jh74vRlPy1PgjWL5494b3X
+5fxDidH4bqPZyxTBqPrUFuo+EfUVEqiGF94Ppq6ZUvrBGOVo1V1+Ifm9CGEK597c
+aevcGc1RFlgxIgN84UpuDjPR9/zSndwJ7XsXYvZ6HXcKGagRKsfYDWGPkA5cOL/e
+f+yObOnC43yPUvpggQ4KaNJ6+SMTZOKikM8yciyBwLqwrjo8FlJgkv8Vfag/2UR7
+JINbyqHHoLUhQ2m6HXSwK4YjtwidF9EUkaBZWrrskYR3IRZLXlWqeOi/+ezYOW0m
+vufrkcvsh+TKlVVnuwmEPjJ8mwUSpsLdfPJo1DHsd8FS03SCKPaXFdD7ePfEjiYk
+nHpQaKE01aWVSLUiygn7F7rYemGqV9Vt7tBw5pz0vqSC72a5E3zFzIIuHx6aANry
+Gat3aqU3qtBXOrA/dPkX9cWE+UR5wo/A2UdKJZLlGhM2WRJ3ltmGT48V9CeS6N9Y
+m4CKdzvg7EWjlTlFrd/8WJ2KoqOE9leDPeXRPncubJfJ6LLIHyG09h9kKQARAQAB
+tDpDZW50T1MgKENlbnRPUyBPZmZpY2lhbCBTaWduaW5nIEtleSkgPHNlY3VyaXR5
+QGNlbnRvcy5vcmc+iQI3BBMBAgAhBQJczFsZAhsDBgsJCAcDAgYVCAIJCgsDFgIB
+Ah4BAheAAAoJEAW1VbOEg8ZdjOsP/2ygSxH9jqffOU9SKyJDlraL2gIutqZ3B8pl
+Gy/Qnb9QD1EJVb4ZxOEhcY2W9VJfIpnf3yBuAto7zvKe/G1nxH4Bt6WTJQCkUjcs
+N3qPWsx1VslsAEz7bXGiHym6Ay4xF28bQ9XYIokIQXd0T2rD3/lNGxNtORZ2bKjD
+vOzYzvh2idUIY1DgGWJ11gtHFIA9CvHcW+SMPEhkcKZJAO51ayFBqTSSpiorVwTq
+a0cB+cgmCQOI4/MY+kIvzoexfG7xhkUqe0wxmph9RQQxlTbNQDCdaxSgwbF2T+gw
+byaDvkS4xtR6Soj7BKjKAmcnf5fn4C5Or0KLUqMzBtDMbfQQihn62iZJN6ZZ/4dg
+q4HTqyVpyuzMXsFpJ9L/FqH2DJ4exGGpBv00ba/Zauy7GsqOc5PnNBsYaHCply0X
+407DRx51t9YwYI/ttValuehq9+gRJpOTTKp6AjZn/a5Yt3h6jDgpNfM/EyLFIY9z
+V6CXqQQ/8JRvaik/JsGCf+eeLZOw4koIjZGEAg04iuyNTjhx0e/QHEVcYAqNLhXG
+rCTTbCn3NSUO9qxEXC+K/1m1kaXoCGA0UWlVGZ1JSifbbMx0yxq/brpEZPUYm+32
+o8XfbocBWljFUJ+6aljTvZ3LQLKTSPW7TFO+GXycAOmCGhlXh2tlc6iTc41PACqy
+yy+mHmSv
+=kkH7
+-----END PGP PUBLIC KEY BLOCK-----
+EOF
