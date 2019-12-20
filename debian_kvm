@@ -1,0 +1,446 @@
+###环境为 VMware 虚拟机 debian10 4c 4g 安装KVM
+
+
+grep -i -E '(vmx|svm|lm)' /proc/cpuinfo
+lsmod |grep kvm
+
+grep --color --perl-regexp'vmx | svm' / proc / cpuinfo
+apt -y install qemu qemu-kvm qemu-system qemu-utils
+apt -y install libvirt-clients libvirt-daemon-system virtinst
+apt -y install  bridge-utils 
+systemctl status libvirtd
+systemctl start libvirtd
+virsh net-list --all
+virsh net-start default
+virsh net-autostart default
+virsh list --all
+
+odprobe vhost_net 
+lsmod | grep vhost
+
+apt -y install virt-top libguestfs-tools libosinfo-bin  qemu-system virt-manager
+
+#创建虚拟机 nat
+virt-install --connect qemu:///system -n debian01 -r 1024 -vcpus=1 --disk path=/kvmdisk/disk/server01.img,device=disk,bus=virtio,size=10,format=qcow2 -c /kvmdisk/ios/debian-10.1.0-amd64-netinst.iso --network network=default --network network=default --graphics vnc,listen=0.0.0.0 --os-type=linux --noautoconsole --accelerate
+virt-install --connect qemu:///system -n debian01 -r 1024 -vcpus=1 --disk path=/kvmdisk/disk/server01.img,device=disk,bus=virtio,size=10,format=qcow2 -c /kvmdisk/ios/debian-10.1.0-amd64-netinst.iso --network network=default --graphics vnc,listen=0.0.0.0 --os-type=linux --os-variant=debian10 --boot=cdrom,hd --noautoconsole --accelerate
+
+
+
+#创建虚拟机 brctl
+#网桥工具
+apt install bridge-utils
+#第一步，成立一个桥接网络接口
+brctl addbr br0
+#查抄是否乐成：
+ip addr show
+#将两个网络接口归并为一个桥接设备，意思即为两个网卡共享网络毗连：
+brctl addif br0 eth0
+
+vi /etc/network/interfaces
+#假如原有的网卡是eth0，且通过dhcp自动获取ip（即电脑连接路由器自动上网），
+#!!注释或删除掉其他所有eth0相关的设置，其他内容不变，在文件最后添加如下内容：
+auto br0
+iface br0 inet dhcp        
+bridge_ports eth0        
+bridge_stp off        
+bridge_fd 0        
+bridge_maxwait 0
+
+#如果原有eth0是手动配置的静态ip，则修改配置类似如下：
+auto br0
+iface br0 inet static        
+address 10.18.44.26        
+netmask 255.255.255.192        
+gateway 10.18.44.1        
+dns-nameservers 10.0.80.11 10.0.80.12        
+bridge_ports eth0        
+bridge_stp off
+bridge_fd 0
+bridge_maxwait 0
+
+virt-install --connect qemu:///system -n centos01 -r 1024 -vcpus=1 --disk path=/kvmdisk/disk/centos01.img,device=disk,bus=virtio,size=10,format=qcow2 -c /kvmdisk/ios/CentOS-8-x86_64-1905-dvd1.iso --network bridge=br0 --graphics vnc,listen=0.0.0.0 --os-type=linux --os-variant=centos7.0 --boot=cdrom,hd --noautoconsole --accelerate
+
+
+
+http://notes.maxwi.com/2016/11/29/kvm-create-and-manage/
+
+
+osinfo-query os
+
+virsh list --all
+
+virsh vncdisplay server01
+
+virsh list --all
+
+强制停止虚拟机
+virsh destroy vm4
+删除虚拟机
+virsh undefine vm4
+启动虚拟机
+virsh start server01
+
+
+
+创建虚拟机硬盘（格式为qcow2，该格式创建后不会立即占用10G空间，而是在使用中动态增长；也可以是raw格式，会立即分配空间。大小为10G）：
+$ qemu-img create -f qcow2 test.qcow2 10G
+查看磁盘信息：
+$ qemu-img info test.img
+创建快照：qemu-img snapshot -c <标签> test.qcow2
+恢复快照：qemu-img snapshot -a <标签> test.qcow2
+删除快照：qemu-img snapshot -d <标签> test.qcow2
+
+
+#您可以使用以下命令列出所有KVM虚拟机：
+virsh list --all
+#如您所见，新的KVM虚拟机server01正在运行。
+#现在，使用以下命令打印server01虚拟机的VNC端口：
+virsh vncdisplay debian01
+#如您所见，VNC端口为：0
+
+find / -name centos*
+
+
+##################################################################
+##################################################################
+##################################################################
+#新增加一块磁盘
+#创建磁盘
+qemu-img create -f qcow2 centos.qcow2 50G
+#查看磁盘信息
+qemu-img info centos.qcow2
+
+virsh edit debian01
+#找到硬盘配置(原来的系统硬盘)
+<disk type='file' device='disk'>
+<driver name='qemu' type='raw'/>
+<source file='/disk/sdb1/c1.img'/>
+<target dev='vda' bus='virtio'/>
+<address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
+</disk>
+#增加文件硬盘,vdb
+<disk type='file' device='disk'>
+<driver name='qemu' type='qcow2'/>
+<source file='/kvmdisk/disk/server01-1.img'/>
+<target dev='vdb' bus='virtio'/>
+<address type='pci' domain='0x0000' bus='0x00' slot='0x09' function='0x0'/>
+</disk>
+#保存退出
+
+virsh destroy debian01
+virsh list
+virsh start debian01
+virsh list
+
+#进入虚拟机
+virsh console debian01
+##################################################################
+##################################################################
+##################################################################
+
+ #设置随宿主机开机自启动
+virsh autostart 虚拟机名   
+检查在/etc/libvirt/qemu/autostart/下会生成一个（虚拟机名.xml）文件
+virsh autostart --disable 虚拟机名  #取消随宿主机开机自启动
+————————————————
+版权声明：本文为CSDN博主「被取名逼疯的男人」的原创文章，遵循 CC 4.0 BY-SA 版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/lxypeter521/article/details/80756107
+原文链接：https://blog.csdn.net/lxypeter521/article/details/80756107
+
+##################################################################
+##################################################################
+##################################################################
+
+
+virsh命令管理虚拟机　
+	libvirt有两种控制方式，命令行和图形界面。
+	　　1.图形界面：通过执行名virt-manager，启动libvirt的图形界面，在图形界面下可以一步一步的创建虚拟机，管理虚拟机，还可以直接控制虚拟机的桌面。
+	　　2.命令行就是接下来我所说的。如何通过命令行来控制虚拟机。
+	创建虚拟机
+	　　在/etc/libvirt/qemu下新建xml文件，如node.xml。需要有内存、cpu、硬盘设置、光驱以及vnc等等。以下是我根据Openstack启的虚机修改而成，没办法，直接用Openstack的文件启动虚机会失败的，网桥不兼容什么的原因，具体的我忘了，原谅我那只有7秒钟的记忆吧~代码贴到下面了：
+	 View Code
+　	　代码分析：　
+	　　1.<domain type='kvm'>  　　　　　　　　　　　　　　　　           域类型，也可以是xen
+	　　2.<name>node3</name> 　　　　　　　　　　　　　　　　         虚拟机的名字
+	　　3.<memory unit='KiB'>524288</memory>  　　　　　　　         虚拟机的最大内存
+	　　4.<currentMemory unit='KiB'>524288</currentMemory> 　　　 虚拟机当前的内存
+	　　5.<vcpu>2</vcpu> 　　　　　　　　　　　　　　　　　　　　　　 该虚拟机的cpu数
+	　　6.<boot dev='hd'/> 　　　　　　　　　　　　　　　　　　　　　　hd表示从硬盘启动，cdrom表示从光盘启动
+	　　7.<type arch='x86_64' machine='rhel6.5.0'>hvm</type>　　　表示全虚拟化
+	　　其实还有好多其他的属性：
+	　　1.<console type='pty'> 　　　　　　　　　　　　　　　　　　　   console用来代表交互性的控制台
+	　　2.<interface type='bridge'>   　　　　　　　　　　　　　　　　　 网桥
+	　　3.<source bridge='virbr0'/>　　　　　　　　　　　　　　　　　　 网桥名
+	　　4.<mac address='00:16:36:1e:1d:04'/>　　　　　　　　　　　 MAC地址
+	　　5.<graphics type='vnc' autoport='yes' keymap='en-us'/>       图形类型
+	　　编辑之后就可以保存退出了。
+	启动虚拟机
+	1 virsh define /etc/libvirt/qemu/node3.xml
+	2 virsh start node3
+	 　第一行命令就是创建定义也就是创建一个虚拟机。第二行就是启动刚刚创建的虚拟机，如果启动成功，可以使用命令
+	1 virsh list
+	　查看刚刚启动的虚拟机。
+	迁移虚拟机
+	　在进行迁移之前，需要先配置一下你的两台物理机，具体配置方法请移步Openstack虚拟机热迁移，然后参照此文进行配置。
+	　配置完成后先使用命令行
+	1 virsh -c qemu+ssh://ip/system
+	　进行测试，如果可以进入virsh然后可以进行如下的命令进行迁移：
+	1 virsh migrate --live qemu+ssh://ip/system --unsafe
+	其它操作
+	　　virsh start x                                 　　　　启动名字为x的非活动虚拟机
+	　　virsh create x.xml                   　　　　　  创建虚拟机（创建后，虚拟机立即执行，成为活动主机）
+	　　virsh suspend x                            　　　　暂停虚拟机
+	　　virsh resume x                             　　　　启动暂停的虚拟机
+	　　virsh shutdown x                    　　 　　　正常关闭虚拟机
+	　　virsh destroy x                             　　　　强制关闭虚拟机
+	　　virsh dominfo x                              　　　显示虚拟机的基本信息
+	　　virsh domname 2                                   显示id号为2的虚拟机名
+	　　virsh domid x                                　　　显示虚拟机id号
+	　　virsh domuuid x                             　　显示虚拟机的uuid
+	　　virsh domstate x                         　　　 显示虚拟机的当前状态
+	　　virsh dumpxml x                            　　显示虚拟机的当前配置文件（可能和定义虚拟机时的配置不同，因为当虚拟机启动时，需要给虚拟机分配id号、uuid、vnc端口号等等）
+	　　virsh setmem x 512000                  　　给不活动虚拟机设置内存大小
+	　　virsh edit x                                   　　编辑配置文件（一般是在刚定义完虚拟机之后）
+
+
+
+##################################################################
+##################################################################
+##################################################################
+
+新增加一块网卡
+为KVM虚拟机添加网卡，并配置IP
+1、查看虚拟机原有网卡信息
+
+[root@room1pc01 ~]# virsh domiflist rh6_node13
+Interface  Type       Source     Model       MAC
+-------------------------------------------------------
+-          network    private1   virtio      54:52:01:01:13:01
+-          network    private2   virtio      54:52:01:01:13:02
+-          network    public1    virtio      54:52:01:01:13:03
+-          network    public2    virtio      54:52:01:01:13:04
+2、为虚拟机添加新的网卡（需要虚拟机在开机状态下操作）
+
+[root@room1pc01 data]# virsh attach-interface --domain rh6_node01 --type bridge  --source br0 --config
+成功附加接口
+[root@room1pc01 data]# virsh domiflist rh6_node01
+Interface  Type       Source     Model       MAC
+-------------------------------------------------------
+vnet0      network    private1   virtio      54:52:01:01:01:01
+vnet1      network    private2   virtio      54:52:01:01:01:02
+vnet2      network    public1    virtio      54:52:01:01:01:03
+vnet3      network    public2    virtio      54:52:01:01:01:04
+vnet4      bridge     br0        -           52:54:00:12:32:3f
+删除网卡
+
+[root@room1pc01 data]# virsh detach-interface rh6_node01 bridge 52:54:00:31:1b:18 --config
+成功分离接口
+3、在虚拟机拷贝网卡文件，修改相关配置，并重启网络服务使配置生效
+
+[root@node2 ~]# cd /etc/sysconfig/network-scripts/
+[root@node2 network-scripts]# cp ifcfg-eth0 ifcfg-eth4
+[root@node2 network-scripts]# vim ifcfg-eth4
+DEVICE=eth4
+TYPE=Ethernet
+ONBOOT=yes
+IPV6INIT=no
+USERCTL=no
+BOOTPROTO=static
+IPADDR=192.168.181.102
+NETMASK=255.255.255.0
+GATEWAY=192.168.181.2
+[root@node2 network-scripts]# /etc/init.d/network restart
+4、测试配置是否生效
+
+[root@node2 network-scripts]# ping 192.168.181.5
+PING 192.168.181.5 (192.168.181.5) 56(84) bytes of data.
+64 bytes from 192.168.181.5: icmp_seq=1 ttl=64 time=4.44 ms
+64 bytes from 192.168.181.5: icmp_seq=2 ttl=64 time=0.580 ms
+————————————————
+版权声明：本文为CSDN博主「PlatoWG」的原创文章，遵循 CC 4.0 BY-SA 版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/PlatoWG/article/details/79760131
+原文链接：https://blog.csdn.net/PlatoWG/article/details/79760131
+
+
+
+
+kvm删除虚拟机网卡操作
+
+第一步：查看虚拟机所包含网卡的mac：
+
+virsh domiflist ${domain-name}
+
+第二步：删除domain网卡：
+
+virsh detach-interface ${domain-name} --type bridge --mac ${mac-address} --config [--live]
+
+virsh detach-interface --type network --mac 52:54:00:01:aa:5e --config --live --domain debian01 
+
+————————————————
+版权声明：本文为CSDN博主「李茂超」的原创文章，遵循 CC 4.0 BY-SA 版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/weixin_42440345/article/details/84880795
+
+##################################################################
+##################################################################
+##################################################################
+
+KVM虚拟机常用管理命令
+KVM虚拟机默认配置文件位置: /etc/libvirt/qemu/，该目录下存放了所有创建过的虚拟机配置文件。
+
+查看virt-install所有支持的OS参数列表：
+
+$ osinfo-query os
+查看正在运行的虚拟主机列表：
+
+$ virsh list
+查看所有虚拟机列表：
+
+$ virsh list --all
+查看虚拟机信息：
+
+$ virsh dominfo centos7
+启动虚拟主机：
+
+$ virsh start centos7
+关闭一个名为centos7的虚拟机：
+
+$ virsh shutdown centos7
+由于virsh实际上不能对虚拟机进行关机，只有虚拟机配置了acpid服务之后才能通过virsh进行关机，配置命令为：
+
+$ sudo chkconfig acpid on
+$ sudo service acpid restart
+注意这是指在虚拟机中配置该服务
+
+暂停/挂起虚拟主机：
+
+$ virsh suspend centos7
+恢复暂停状态的虚拟机：
+
+$virsh resume centos7
+软重启（安全重启，相当于在虚拟机内部点击重启选项）虚拟机：
+
+$ virsh reboot centos7
+硬重启虚拟机（不安全，有可能数据丢失，相当于强制按主机上的重启按钮）：
+
+$ virsh reset centos7
+设置虚拟机随着宿主主机开机自动启动：
+
+$ virsh autostart centos7
+开机自动启动的虚拟机配置文件会自动在目录/etc/libvirt/qemu/autostart/目录下生成。
+用开机自动启动：
+
+$ virsh autostart --disable centos7
+移除虚拟机定义，即从虚拟机列表中移除虚拟机：
+
+$ virsh undefine centos7
+该命令只是删除/etc/libvirt/qemu/目录下名为centos7.xml的配置文件，并不会删除虚拟机磁盘文件
+
+通过虚拟机配置文件重新定义虚拟机：
+
+$ virsh define centos7.xml
+强制关闭虚拟机电源：
+
+$ virsh destroy centos7
+编辑虚拟机配置文件：
+
+$ virsh edit centos7
+该命令会调用本地编辑器编辑虚拟机配置文件，虽然也可以手动使用vim去编辑/etc/libvirt/qemu/centos7.xml下的虚拟机配置文件，但不建议，最好还是通过virsh edit调用编辑器来编辑虚拟机配置文件
+
+查看virsh的所有命令或指定的命令：
+
+$ virsh --help
+可以配合grep来查看某个选项相关的所有相关指令，例如我想查看跟开机有关的所有相关指令：
+
+$ virsh --help | grep start
+如果想看到详情，最好还是看man手册：
+
+man virsh
+查看当前主机上hypervisor的连接路径：
+
+$ virsh uri
+创建虚拟机硬盘（格式为qcow2，该格式创建后不会立即占用10G空间，而是在使用中动态增长；也可以是raw格式，会立即分配空间。大小为10G）：
+
+$ qemu-img create -f qcow2 test.qcow2 10G
+查看磁盘信息：
+
+$ qemu-img info test.img
+qcow2格式文件的快照管理命令：
+
+创建快照：qemu-img snapshot -c <标签> test.qcow2
+恢复快照：qemu-img snapshot -a <标签> test.qcow2
+删除快照：qemu-img snapshot -d <标签> test.qcow2
+进入virsh管理程序：
+
+$ virsh
+出现virsh提示符后，你就可以使用任何virsh命令了。
+
+上面的命令对应的非root管理用户命令，即没有将当前用户组加入到管理组，且没有root权限的用户，可以通过加入–connect qemu:///system的方式实现虚拟机的管理，如创建和移除虚拟机的命令：
+
+$ virsh --connect qemu:///system create centos7.xml
+$ virsh --connect qemu:///system destroy centos7.xml
+感觉还是设置好用户组之后直接使用virsh管理KVM虚拟机更加方便
+
+
+http://notes.maxwi.com/2016/11/29/kvm-create-and-manage/
+http://notes.maxwi.com/2016/11/29/kvm-create-and-manage/
+
+##################################################################
+##################################################################
+##################################################################
+
+以下未验证
+以下未验证
+以下未验证
+
+virt-install --connect qemu:///system -n CentOS7u2 -r 65536 --vcpus=4 --disk path=/sdc1/CentOS-7u2.raw -c /tmp/CentOS-7.2-x86_64-DVD-1511.iso --network network=default --network network=default --graphics vnc,listen=0.0.0.0 --os-type=linux --noautoconsole --accelerate
+
+virt-install --virt-type kvm --name win7 --ram 16384 --vcpu=2 --cdrom=/opt/kvm/cn_windows_7_enterprise_x64_dvd_x15-70741.iso --boot cdrom --disk path=/opt/kvm/windows.img,format=qcow2 --network bridge=br0 --graphics vnc,listen=0.0.0.0 --noautoconsole --os-type=windows
+
+virt-install --connect qemu:///system -n pta -r 204800 -vcpus=4 --disk path=/opt/kvm/pta.qcow2 -c /opt/kvm/CentOS-6.7-x86_64-bin-DVD1.iso --network network=default --network network=default --graphics vnc,listen=0.0.0.0 --os-type=linux --noautoconsole --accelerate
+
+virt-install --name=debian --disk path=/media/deepin/Home/deepin/Spoll1/debian10.img --graphics spice --vcpu=2 --ram=2048 --cdrom=/media/deepin/Home/deepin/debian-10.0.0-arm64-DVD-1.iso --network bridge=virbr0 --os-variant=linux
+virt-install --connect qemu:///system -n CentOS7u2 -r 65536 --vcpus=4 --disk path=/sdc1/CentOS-7u2.raw -c /tmp/CentOS-7.2-x86_64-DVD-1511.iso --network network=default --network network=default --graphics vnc,listen=0.0.0.0 --os-type=linux --noautoconsole --accelerate
+
+
+
+virt-install --name server01 \
+--os-type linux \
+--os-variant debian01 \
+--memory 1024 \
+--vcpus 1 \
+--disk /kvmdisk/disk/server01.img,device=disk,bus=virtio,size=10,format=qcow2 \
+--graphics vnc,listen=0.0.0.0 \
+--noautoconsole \
+--hvm \
+--cdrom /kvmdisk/ios/debian-10.1.0-amd64-netinst.iso \
+--boot cdrom,hd
+
+
+
+
+virt-install \
+--virt-type kvm \
+--name Debian-kvm \
+--memory 1024 \ #单位为M
+--vcpus 1 \
+--os-variant debian9 \
+--hvm \ #请求全虚拟化
+--cdrom /home/user/kvmiso/debian9.iso \
+--network bridge=br0,model=virtio \
+--graphics vnc \
+--disk path=/home/user/kvmimg/debian-kvm.qcow2,size=30,bus=virtio,format=qcow2 \ #常用格式有raw\qcow2\vmdk
+
+
+
+
+
+
+
+安装系统：
+
+virt-install -n x1 -r 4096 --vcpus 4 --disk path=/home/wangjq/x1.qcow2,size=60,format=qcow2,bus=virtio,target=vda --network bridge=br0,model=virtio --os-type linux --os-variant rhel7 --cdrom=/home/wangjq/centos7.iso
+ 
+
+启动虚机：
+
+virt-install -n x2 -r 4096 --vcpus 4 --disk path=/home/wangjq/x1.qcow2,size=60,format=qcow2,bus=virtio,target=vda --network bridge=br0,model=virtio --os-type linux --os-variant rhel7 --boot hd 
