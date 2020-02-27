@@ -13,9 +13,9 @@ systemctl start libvirtd
 virsh net-list --all
 virsh net-start default
 virsh net-autostart default
-virsh list --all
+virsh net-list --all
 
-odprobe vhost_net 
+modprobe vhost_net 
 lsmod | grep vhost
 
 apt -y install virt-top libguestfs-tools libosinfo-bin  qemu-system virt-manager
