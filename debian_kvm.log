@@ -328,7 +328,7 @@ $ virsh reset centos7
 $ virsh autostart centos7
 开机自动启动的虚拟机配置文件会自动在目录/etc/libvirt/qemu/autostart/目录下生成。
 
-用开机自动启动：
+取消开机自动启动：
 $ virsh autostart --disable centos7
 
 移除虚拟机定义，即从虚拟机列表中移除虚拟机：
