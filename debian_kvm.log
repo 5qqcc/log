@@ -60,6 +60,8 @@ bridge_maxwait 0
 
 virt-install --connect qemu:///system -n centos01 -r 1024 -vcpus=1 --disk path=/kvmdisk/disk/centos01.img,device=disk,bus=virtio,size=10,format=qcow2 -c /kvmdisk/ios/CentOS-8-x86_64-1905-dvd1.iso --network bridge=br0 --graphics vnc,listen=0.0.0.0 --os-type=linux --os-variant=centos7.0 --boot=cdrom,hd --noautoconsole --accelerate
 
+#virt-install --connect qemu:///system -n win101 -r 4096 -vcpus=4 --disk path=/opt/kvmdisk/win101.img,device=disk,bus=virtio,size=60,format=qcow2 --disk path=/opt/download/virtio-win-0.1.173.iso,device=cdrom -c /opt/download/cn_windows_10_enterprise_ltsc_2019_x64_dvd_9c09ff24.iso  --network bridge=br0 --graphics vnc,listen=0.0.0.0 --os-type=windows --os-variant=win10 --boot=cdrom,hd --noautoconsole --accelerate
+
 
 
 http://notes.maxwi.com/2016/11/29/kvm-create-and-manage/
